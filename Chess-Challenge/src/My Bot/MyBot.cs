@@ -1,174 +1,154 @@
-﻿using System;
+﻿using ChessChallenge.API;
+using System;
 using System.Linq;
-using ChessChallenge.API;
 
 public class MyBot : IChessBot
 {
-    int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
-
-    private int[] pawnEval =
+    private int[,] positionEval =
     {
-        0, 0, 0, 0, 0, 0, 0, 0,
-        50, 50, 50, 50, 50, 50, 50, 50,
-        10, 10, 20, 30, 30, 20, 10, 10,
-        5, 5, 10, 25, 25, 10, 5, 5,
-        0, 0, 0, 20, 20, 0, 0, 0,
-        5, -5, -10, 0, 0, -10, -5, 5,
-        5, 10, 10, -20, -20, 10, 10, 5,
-        0, 0, 0, 0, 0, 0, 0, 0
+        {
+            0,  0,  0,  0,  0,  0,  0,  0,
+            50, 50, 50, 50, 50, 50, 50, 50,
+            10, 10, 20, 30, 30, 20, 10, 10,
+            5,  5, 10, 25, 25, 10,  5,  5,
+            0,  0,  0, 20, 20,  0,  0,  0,
+            5, -5,-10,  0,  0,-10, -5,  5,
+            5, 10, 10,-20,-20, 10, 10,  5,
+            0,  0,  0,  0,  0,  0,  0,  0
+        },
+        {
+            -50,-40,-30,-30,-30,-30,-40,-50,
+            -40,-20,  0,  0,  0,  0,-20,-40,
+            -30,  0, 10, 15, 15, 10,  0,-30,
+            -30,  5, 15, 20, 20, 15,  5,-30,
+            -30,  0, 15, 20, 20, 15,  0,-30,
+            -30,  5, 10, 15, 15, 10,  5,-30,
+            -40,-20,  0,  5,  5,  0,-20,-40,
+            -50,-40,-30,-30,-30,-30,-40,-50,
+        },
+        {
+            -20,-10,-10,-10,-10,-10,-10,-20,
+            -10,  0,  0,  0,  0,  0,  0,-10,
+            -10,  0,  5, 10, 10,  5,  0,-10,
+            -10,  5,  5, 10, 10,  5,  5,-10,
+            -10,  0, 10, 10, 10, 10,  0,-10,
+            -10, 10, 10, 10, 10, 10, 10,-10,
+            -10,  5,  0,  0,  0,  0,  5,-10,
+            -20,-10,-10,-10,-10,-10,-10,-20,
+        },
+        {
+            0,  0,  0,  0,  0,  0,  0,  0,
+            5, 10, 10, 10, 10, 10, 10,  5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+            -5,  0,  0,  0,  0,  0,  0, -5,
+            0,  0,  0,  5,  5,  0,  0,  0
+        },
+        {
+            -20,-10,-10, -5, -5,-10,-10,-20,
+            -10,  0,  0,  0,  0,  0,  0,-10,
+            -10,  0,  5,  5,  5,  5,  0,-10,
+            -5,  0,  5,  5,  5,  5,  0, -5,
+            0,  0,  5,  5,  5,  5,  0, -5,
+            -10,  5,  5,  5,  5,  5,  0,-10,
+            -10,  0,  5,  0,  0,  0,  0,-10,
+            -20,-10,-10, -5, -5,-10,-10,-20
+        },
+        {
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -20,-30,-30,-40,-40,-30,-30,-20,
+            -10,-20,-20,-20,-20,-20,-20,-10,
+            20, 20,  0,  0,  0,  0, 20, 20,
+            20, 30, 10,  0,  0, 10, 30, 20
+        },
+        {
+            -50,-40,-30,-20,-20,-30,-40,-50,
+            -30,-20,-10,  0,  0,-10,-20,-30,
+            -30,-10, 20, 30, 30, 20,-10,-30,
+            -30,-10, 30, 40, 40, 30,-10,-30,
+            -30,-10, 30, 40, 40, 30,-10,-30,
+            -30,-10, 20, 30, 30, 20,-10,-30,
+            -30,-30,  0,  0,  0,  0,-30,-30,
+            -50,-30,-30,-30,-30,-30,-30,-50
+        }
     };
 
-    private int[] knightEval =
-    {
-        -50, -40, -30, -30, -30, -30, -40, -50,
-        -40, -20, 0, 0, 0, 0, -20, -40,
-        -30, 0, 10, 15, 15, 10, 0, -30,
-        -30, 5, 15, 20, 20, 15, 5, -30,
-        -30, 0, 15, 20, 20, 15, 0, -30,
-        -30, 5, 10, 15, 15, 10, 5, -30,
-        -40, -20, 00, 5, 05, 00, -20, -40,
-        -50, -40, -30, -30, -30, -30, -40, -50
-    };
+    int[] pieceVal = { 0, 100, 300, 310, 500, 900, 10000 };
+    int massiveNum = 99999999;
+    int startingDepth = 4;
+    int captureDepth = 1;
+    int totalDepth;
+    Move bestMoveRoot = Move.NullMove;
 
-    private int[] bishopEval =
+    int NegaMax(Board board, int depth, int alpha, int beta, int color)
     {
-        -20, -10, -10, -10, -10, -10, -10, -20,
-        -10, 0, 0, 0, 0, 0, 0, -10,
-        -10, 0, 5, 10, 10, 5, 0, -10,
-        -10, 5, 5, 10, 10, 5, 5, -10,
-        -10, 0, 10, 10, 10, 10, 0, -10,
-        -10, 10, 10, 10, 10, 10, 10, -10,
-        -10, 5, 0, 0, 0, 0, 5, -10,
-        -20, -10, -10, -10, -10, -10, -10, -20
-    };
+        if (board.IsDraw())
+            return 0;
 
-    private int[] rookEval =
-    {
-        0, 0, 0, 0, 0, 0, 0, 0,
-        5, 10, 10, 10, 10, 10, 10, 5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        0, 0, 0, 5, 5, 0, 0, 0
-    };
+        Move[] legalMoves = depth > captureDepth ? board.GetLegalMoves() : board.GetLegalMoves(true);
 
-    private int[] queenEval =
-    {
-        -20, -10, -10, -5, -5, -10, -10, -20,
-        -10, 0, 0, 0, 0, 0, 0, -10,
-        -10, 0, 5, 5, 5, 5, 0, -10,
-        -5, 0, 5, 5, 5, 5, 0, -5,
-        0, 0, 5, 5, 5, 5, 0, -5,
-        -10, 5, 5, 5, 5, 5, 0, -10,
-        -10, 0, 5, 0, 0, 0, 0, -10,
-        -20, -10, -10, -5, -5, -10, -10, -20
-    };
-    
-    public Move Think(Board board, Timer timer)
-    {
-        int depth = 3;
-        int bestMove = -9999;
-        
-        var possibleMoves = board.GetLegalMoves();
-        Move bestMoveFound = possibleMoves[0];
+        if (depth == 0 || legalMoves.Length == 0)
+        {
+            int sum = 0;
 
-        foreach (var move in possibleMoves)
+            if (board.IsInCheckmate())
+                return -massiveNum;
+
+            for (int i = 0; ++i < 7;)
+            {
+                PieceList white = board.GetPieceList((PieceType)i, true);
+                PieceList black = board.GetPieceList((PieceType)i, false);
+
+                sum += (white.Count - black.Count) * pieceVal[i];
+
+                if (i == 6 && board.GetAllPieceLists().Sum(pieceList => pieceList.Count) < 16)
+                {
+                    sum += white.Sum(piece => positionEval[6, piece.Square.Index]);
+                    sum -= black.Sum(piece => positionEval[6, 63 - piece.Square.Index]);
+                }
+                else
+                {
+                    sum += white.Sum(piece => positionEval[i - 1, piece.Square.Index]);
+                    sum -= black.Sum(piece => positionEval[i - 1, 63 - piece.Square.Index]);
+                }
+            }
+
+            return color * sum;
+        }
+
+        int recordEval = int.MinValue;
+
+        foreach (Move move in legalMoves)
         {
             board.MakeMove(move);
-
-            var moveValue = MiniMax(depth, board, -10000, 10000, false);
-            
+            int evaluation = -NegaMax(board, depth - 1, -beta, -alpha, -color);
             board.UndoMove(move);
 
-            if (moveValue >= bestMove)
+            if (recordEval < evaluation)
             {
-                bestMove = moveValue;
-                bestMoveFound = move;
+                recordEval = evaluation;
+                if (depth == totalDepth)
+                    bestMoveRoot = move;
             }
+
+            alpha = Math.Max(alpha, recordEval);
+            if (alpha >= beta) break;
         }
 
-        return bestMoveFound;
+        return recordEval;
     }
 
-    private int MiniMax(int depth, Board board, int alpha, int beta, bool isMaximisingPlayer)
+    public Move Think(Board board, Timer timer)
     {
-        if (board.IsInCheckmate())
-        {
-            return isMaximisingPlayer ? -9999 : 9999;
-        }
+        totalDepth = startingDepth + captureDepth;
 
-        if (board.IsDraw())
-        {
-            return 0;
-        }
-        
-        if (depth == 0)
-        {
-            return Evaluate(board, isMaximisingPlayer);
-        }
+        NegaMax(board, totalDepth, -massiveNum, massiveNum, board.IsWhiteToMove ? 1 : -1);
 
-        var possibleMoves = board.GetLegalMoves();
-
-        if (isMaximisingPlayer)
-        {
-            var bestMove = -9999;
-            foreach (var move in possibleMoves)
-            {
-                board.MakeMove(move);
-                bestMove = Math.Max(bestMove, MiniMax(depth - 1, board, alpha, beta, !isMaximisingPlayer));
-                board.UndoMove(move);
-                alpha = Math.Max(alpha, bestMove);
-                if (beta <= alpha)
-                {
-                    return bestMove;
-                }
-            }
-            return bestMove;
-        }
-        else
-        {
-            var bestMove = 9999;
-            foreach (var move in possibleMoves)
-            {
-                board.MakeMove(move);
-                bestMove = Math.Min(bestMove, MiniMax(depth - 1, board, alpha, beta, !isMaximisingPlayer));
-                board.UndoMove(move);
-                beta = Math.Min(beta, bestMove);
-                if (beta <= alpha)
-                {
-                    return bestMove;
-                }
-            }
-            return bestMove;
-        }
-    }
-
-    private int Evaluate(Board board, bool isMaximisingPlayer)
-    {
-        var pieceLists = board.GetAllPieceLists();
-        int whiteEvaluation = 0, blackEvaluation = 0;
-
-        whiteEvaluation += pieceLists[0].Sum(piece => pawnEval[piece.Square.Index] + pieceValues[1]);
-        whiteEvaluation += pieceLists[1].Sum(piece => knightEval[piece.Square.Index] + pieceValues[2]);
-        whiteEvaluation += pieceLists[2].Sum(piece => bishopEval[piece.Square.Index] + pieceValues[3]);
-        whiteEvaluation += pieceLists[3].Sum(piece => rookEval[piece.Square.Index] + pieceValues[4]);
-        whiteEvaluation += pieceLists[4].Sum(piece => queenEval[piece.Square.Index] + pieceValues[5]);
-
-        blackEvaluation += pieceLists[6].Sum(piece => pawnEval[63 - piece.Square.Index] + pieceValues[1]);
-        blackEvaluation += pieceLists[7].Sum(piece => knightEval[63 - piece.Square.Index] + pieceValues[2]);
-        blackEvaluation += pieceLists[8].Sum(piece => bishopEval[63 - piece.Square.Index] + pieceValues[3]);
-        blackEvaluation += pieceLists[9].Sum(piece => rookEval[63 - piece.Square.Index] + pieceValues[4]);
-        blackEvaluation += pieceLists[10].Sum(piece => queenEval[63 - piece.Square.Index] + pieceValues[5]);
-
-        if (isMaximisingPlayer)
-        {
-            return board.IsWhiteToMove ? whiteEvaluation - blackEvaluation : blackEvaluation - whiteEvaluation;
-        }
-        else
-        {
-            return board.IsWhiteToMove ? blackEvaluation - whiteEvaluation : whiteEvaluation - blackEvaluation;
-        }
+        return bestMoveRoot;
     }
 }
