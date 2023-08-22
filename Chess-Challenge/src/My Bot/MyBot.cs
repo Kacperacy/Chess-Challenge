@@ -1,14 +1,12 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Linq;
 
 public class MyBot : IChessBot
 {
     int[] pieceVal = { 0, 100, 300, 310, 500, 900, 10000 };
     int mateVal = 99999999;
-    int maxDepth = 4;
     Move bestMoveRoot;
-
+    
     int Evaluate(Board board)
     {
         int sum = 0;
@@ -19,42 +17,62 @@ public class MyBot : IChessBot
         return sum * (board.IsWhiteToMove ? 1 : -1);
     }
     
-    int Search(Board board, int depth, int alpha, int beta, int ply)
+    int Search(Board board, Timer timer, int alpha, int beta, int depth, int ply)
     {
+        if (ply > 0 && board.IsRepeatedPosition()) return 0;
+        
         Move[] legalMoves = board.GetLegalMoves();
 
+        if (ply == 0 && !bestMoveRoot.IsNull)
+        {
+            for (int i = 0; i < legalMoves.Length; i++)
+            {
+                if(legalMoves[i] == bestMoveRoot)
+                {
+                    legalMoves[i] = legalMoves[0];
+                    legalMoves[0] = bestMoveRoot;
+                }
+            }
+        }
+        
         if (legalMoves.Length == 0)
             return board.IsInCheck() ? ply - mateVal : 0;
 
         if (depth == 0)
             return Evaluate(board);
 
-        int recordEval = int.MinValue;
+        int bestEval = int.MinValue;
 
         foreach (Move move in legalMoves)
         {
             board.MakeMove(move);
-            int evaluation = -Search(board, depth - 1, -beta, -alpha, ply + 1);
+            int evaluation = -Search(board, timer, -beta, -alpha, depth - 1, ply + 1);
             board.UndoMove(move);
-
-            if (recordEval < evaluation)
+            
+            if(timer.MillisecondsElapsedThisTurn >= timer.MillisecondsRemaining / 30) return mateVal;
+            
+            if (evaluation > bestEval)
             {
-                recordEval = evaluation;
+                bestEval = evaluation;
                 if (ply == 0)
                     bestMoveRoot = move;
             }
-
-            alpha = Math.Max(alpha, recordEval);
+            alpha = Math.Max(alpha, bestEval);
             if (alpha >= beta) break;
         }
 
-        return recordEval;
+        return bestEval;
     }
 
     public Move Think(Board board, Timer timer)
     {
-        Search(board, maxDepth, -mateVal, mateVal, 0);
+        bestMoveRoot = Move.NullMove;
+        for (int depth = 1; depth <= 50; depth++)
+        {
+            Search(board, timer, -mateVal, mateVal, depth, 0);
 
-        return bestMoveRoot;
+            if (timer.MillisecondsElapsedThisTurn >= timer.MillisecondsRemaining / 30) break;
+        }
+        return bestMoveRoot.IsNull ? board.GetLegalMoves()[0] : bestMoveRoot;
     }
 }
