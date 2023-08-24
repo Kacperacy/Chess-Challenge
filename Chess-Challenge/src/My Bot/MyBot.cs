@@ -4,14 +4,14 @@ using System;
 public class MyBot : IChessBot
 {
     // Pawn, Knight, Bishop, Rook, Queen, King 
-    int[] pieceVal = { 0, 100, 300, 310, 500, 900, 10000 };
+    private int[] pieceVal = { 0, 100, 300, 310, 500, 900, 10000 };
 
     #region TTEntry
     // 0 = Invalid
     // 1 = Upper bound
     // 2 = Lower bound
     // 3 = Exact score
-    struct TTEntry {
+    private struct TTEntry {
         public ulong key;
         public Move move;
         public int depth, score, bound;
@@ -20,12 +20,14 @@ public class MyBot : IChessBot
         }
     }
 
-    TTEntry[] tt = new TTEntry [0x400000];
+    private TTEntry[] tt = new TTEntry [0x400000];
     #endregion
     
     // Mate value = 99999
-    Move moveRoot;
+    private Move moveRoot;
     private readonly int[] moveScores = new int[218];
+    private int searchMaxTime;
+    private Timer searchTimer;
     
     #region Evaluate()
     int Evaluate(Board board)
@@ -40,11 +42,19 @@ public class MyBot : IChessBot
     #endregion
     
     #region Search()
-    int Search(Board board, Timer timer, int alpha, int beta, int depth, int ply)
+    int Search(Board board, int alpha, int beta, int depth, int ply)
     {
         bool isCheck = board.IsInCheck(), isRoot = ply++ == 0;
         
         if (!isRoot && board.IsRepeatedPosition()) return 0;
+        
+        // Check extension
+        if(isCheck)
+            depth++;
+        
+        // Return at leaf nodes
+        if (depth == 0)
+            return Evaluate(board);
         
         ulong key = board.ZobristKey;
         TTEntry entry = tt[key & 0x3FFFFF];
@@ -56,17 +66,12 @@ public class MyBot : IChessBot
                || entry.bound == 2 && entry.score >= beta // lower bound, fail high
                || entry.bound == 1 && entry.score <= alpha // upper bound, fail low
            )) return entry.score;
-        
-        // Check extension
-        if(isCheck)
-            depth++;
-        
-        if (depth == 0)
-            return Evaluate(board);
 
+        // Get legal moves
         Span<Move> moveSpan = stackalloc Move[218];
         board.GetLegalMovesNonAlloc(ref moveSpan);
         
+        // If no moves are available, return mate score if in check, otherwise return 0
         if (moveSpan.IsEmpty)
             return isCheck ? ply - 99999 : 0;
 
@@ -79,33 +84,41 @@ public class MyBot : IChessBot
                 move == entry.move ? 9_000_000 :
                 // MVV LVA
                 move.IsCapture ? 1_000_000 * (int)move.CapturePieceType - (int)move.MovePieceType :
+                // Promotions
+                move.IsPromotion ? 100_000 : 
                 // Return 0
                 0
             );
 
+        // Sort moves
         moveScores.AsSpan(0, moveSpan.Length).Sort(moveSpan);
         
         int bestEval = int.MinValue, oldAlpha = alpha;
         Move bestMove = Move.NullMove;
 
-        for(int i = 0; i < moveSpan.Length; i++)
+        foreach(Move move in moveSpan)
         {
-            Move move = moveSpan[i];
-            board.MakeMove(move);
-            int evaluation = -Search(board, timer, -beta, -alpha, depth - 1, ply);
-            board.UndoMove(move);
+            if(searchTimer.MillisecondsElapsedThisTurn > searchMaxTime) return 99999;
             
-            if(timer.MillisecondsElapsedThisTurn >= timer.MillisecondsRemaining / 30) return 99999;
+            board.MakeMove(move);
+            int evaluation = -Search(board, -beta, -alpha, depth - 1, ply);
+            board.UndoMove(move);
             
             if (evaluation > bestEval)
             {
                 bestEval = evaluation;
-                bestMove = move;
-                if (ply == 0)
-                    moveRoot = move;
+                
+                if (evaluation > alpha)
+                {
+                    alpha = evaluation;
+                    bestMove = move;
+                    
+                    if (isRoot)
+                        moveRoot = move;
+                }
+                
+                if (alpha >= beta) break;
             }
-            alpha = Math.Max(alpha, bestEval);
-            if (alpha >= beta) break;
         }
         
         tt[key & 0x3FFFFF] = new TTEntry(key, bestMove, depth, bestEval, bestEval >= beta ? 2 : bestEval > oldAlpha ? 1 : 3);
@@ -117,13 +130,18 @@ public class MyBot : IChessBot
     #region Think()
     public Move Think(Board board, Timer timer)
     {
-        for (int depth = 1; depth <= 50; depth++)
-        {
-            Search(board, timer, -99999, 99999, depth, 0);
+        searchMaxTime = timer.MillisecondsRemaining / 30;
+        searchTimer = timer;
 
-            if (timer.MillisecondsElapsedThisTurn >= timer.MillisecondsRemaining / 30) break;
+        for (int depth = 1;;)
+        {
+            Search(board, -99999, 99999, depth, 0);
+
+            if (searchTimer.MillisecondsElapsedThisTurn > searchMaxTime)
+                return moveRoot.IsNull ? board.GetLegalMoves()[0] : moveRoot;
+
+            depth++;
         }
-        return moveRoot.IsNull ? board.GetLegalMoves()[0] : moveRoot;
     }
     #endregion
 }
